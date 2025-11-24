@@ -1,25 +1,61 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function Profile() {
   const nav = useNavigate();
+  const [user, setUser] = useState(null);   // start as null until loaded
+  const [saving, setSaving] = useState(false);
+  const studentId = localStorage.getItem("student_id");
 
-  // Example user state
-  const [user, setUser] = useState({
-    name: "Aaron Mullins",
-    email: "netid@utexas.edu",
-    major: "Management Information Systems",
-    classification: "Junior"
-  });
+  // Load student on mount
+  useEffect(() => {
+    if (!studentId) {
+      console.log("No student logged in");
+      return;
+    }
+
+    fetch(`http://localhost:5000/api/students/${studentId}`)
+      .then(res => res.json())
+      .then(data => {
+        setUser({
+          name: data.name,
+          email: data.email,
+          major: data.major,
+          classification: data.classification
+        });
+      })
+      .catch(err => console.log("Error loading profile:", err));
+  }, [studentId]);
 
   function update(field, value) {
     setUser({ ...user, [field]: value });
   }
 
+  async function saveChanges() {
+    if (!studentId) return;
+    setSaving(true);
+
+    try {
+      await fetch(`http://localhost:5000/api/students/${studentId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(user)
+      });
+
+      alert("Profile updated!");
+    } catch (err) {
+      console.log("Error updating profile:", err);
+    }
+
+    setSaving(false);
+  }
+
   function logout() {
-    // In a real app you'd clear auth state/session
+    localStorage.removeItem("student_id");  // clear student
     nav("/");
   }
+
+  if (!user) return <p style={{padding:20}}>Loading profile...</p>;
 
   return (
     <>
@@ -56,7 +92,9 @@ export default function Profile() {
           onChange={(e) => update("classification", e.target.value)}
         />
 
-        <button style={styles.saveBtn}>Save Changes</button>
+        <button style={styles.saveBtn} onClick={saveChanges} disabled={saving}>
+          {saving ? "Saving…" : "Save Changes"}
+        </button>
 
         <h2 style={{ marginTop: 40 }}>Student Tools</h2>
 

@@ -1,18 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const sampleCourses = [
-  { id:1, code:'MIS 301', title:'Intro to MIS', prof:'Smith', time:'MWF 10–11' },
-  { id:2, code:'MIS 373', title:'Software Dev', prof:'Turner', time:'TTh 2–3:30' },
-  { id:3, code:'ACC 311', title:'Financial Accounting', prof:'Davis', time:'MWF 1–2' }
-];
-
 export default function Dashboard() {
-  const [cart, setCart] = useState([]);
+  const [courses, setCourses] = useState([]);
   const nav = useNavigate();
+  const studentId = localStorage.getItem("student_id");
 
-  function addCourse(c) {
-    if (!cart.find(x=>x.id===c.id)) setCart([...cart,c]);
+  useEffect(() => {
+    fetch("http://localhost:5000/api/courses")
+      .then(res => res.json())
+      .then(data => {
+        const formatted = data.map(c => ({
+          id: c.course_id,
+          code: c.course_code,
+          title: c.title,
+          prof: c.professor,
+          time:
+            (c.time_start ? c.time_start : "TBD") +
+            " - " +
+            (c.time_end ? c.time_end : "TBD")
+        }));
+        setCourses(formatted);
+      })
+      .catch(err => console.log(err));
+  }, []);
+
+  async function register(c) {
+    if (!studentId) {
+      alert("You must be logged in.");
+      return;
+    }
+
+    try {
+      const res = await fetch("http://localhost:5000/api/registrations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ student_id: studentId, course_id: c.id })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Could not add class.");
+        return;
+      }
+
+      alert("Class added to your schedule!");
+
+    } catch (err) {
+      console.log(err);
+      alert("Error adding class.");
+    }
   }
 
   return (
@@ -37,19 +75,29 @@ export default function Dashboard() {
         </button>
 
         <h2>Browse Courses</h2>
+
         <table style={styles.table}>
           <thead>
-            <tr><th>Course</th><th>Title</th><th>Professor</th><th>Time</th><th></th></tr>
+            <tr>
+              <th>Course</th>
+              <th>Title</th>
+              <th>Professor</th>
+              <th>Time</th>
+              <th></th>
+            </tr>
           </thead>
+
           <tbody>
-            {sampleCourses.map(c=>(
+            {courses.map(c => (
               <tr key={c.id}>
                 <td>{c.code}</td>
                 <td>{c.title}</td>
                 <td>{c.prof}</td>
                 <td>{c.time}</td>
                 <td>
-                  <button style={styles.addBtn} onClick={()=>addCourse(c)}>Add</button>
+                  <button style={styles.addBtn} onClick={() => register(c)}>
+                    Add
+                  </button>
                 </td>
               </tr>
             ))}
@@ -58,9 +106,9 @@ export default function Dashboard() {
 
         <button 
           style={styles.cartBtn}
-          onClick={()=>nav('/cart', { state:{cart} })}
+          onClick={() => nav("/schedule")}
         >
-          View Cart ({cart.length})
+          View My Classes
         </button>
       </div>
     </>

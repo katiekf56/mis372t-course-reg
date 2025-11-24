@@ -9,7 +9,25 @@ export default function AddClass() {
   });
 
   function update(field, value) {
-    setForm({...form, [field]: value});
+    setForm({ ...form, [field]: value });
+  }
+
+  async function saveClass() {
+    try {
+      const response = await fetch("http://localhost:5000/api/courses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
+
+      const data = await response.json();
+      alert("Class added!");
+      console.log(data);
+
+    } catch (err) {
+      alert("Error adding class");
+      console.log(err);
+    }
   }
 
   return (
@@ -26,10 +44,10 @@ export default function AddClass() {
         <label>Professor</label>
         <input style={styles.input} onChange={e => update('professor', e.target.value)} />
 
-        <label>Time</label>
+        <label>Time (format: HH:MM-HH:MM)</label>
         <input style={styles.input} onChange={e => update('time', e.target.value)} />
 
-        <button style={styles.saveBtn}>Save Class</button>
+        <button style={styles.saveBtn} onClick={saveClass}>Save Class</button>
       </div>
     </>
   );

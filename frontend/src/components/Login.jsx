@@ -12,23 +12,35 @@ export default function Login() {
 
   const handleLogin = async () => {
     setError("");
-    
-    // Validate inputs
+
     if (!email || !password) {
       setError("Please enter both email and password.");
       return;
     }
 
     try {
+      // Step 1 — Firebase Auth
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       console.log("Login successful!", userCredential.user);
+
+      // Step 2 — Look up student in backend
+      const res = await fetch(`http://localhost:5000/api/students/email/${email}`);
+      const data = await res.json();
+
+      if (!data || !data.student_id) {
+        setError("User exists in Firebase but not in Course Registration DB.");
+        return;
+      }
+
+      // Step 3 — Store student_id for Cart/Dashboard/Profile
+      localStorage.setItem("student_id", data.student_id);
+
+      // Redirect
       nav('/dashboard');
+
     } catch (err) {
       console.error("Full error:", err);
-      console.error("Error code:", err.code);
-      console.error("Error message:", err.message);
-      
-      // Show more specific error messages
+
       if (err.code === 'auth/invalid-credential') {
         setError("Invalid email or password.");
       } else if (err.code === 'auth/user-not-found') {
