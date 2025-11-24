@@ -23,8 +23,10 @@ export default function Login() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       console.log("Login successful!", userCredential.user);
 
-      // Step 2 — Look up student in backend
-      const res = await fetch(`http://localhost:5000/api/students/email/${email}`);
+      // Step 2 — Look up student in backend (UPDATED URL)
+      const res = await fetch(
+        `https://mis372t-course-reg-backend.onrender.com/api/students/email/${email}`
+      );
       const data = await res.json();
 
       if (!data || !data.student_id) {

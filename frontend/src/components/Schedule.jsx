@@ -7,7 +7,7 @@ export default function Schedule() {
   useEffect(() => {
     if (!studentId) return;
 
-    fetch(`http://localhost:5000/api/registrations/student/${studentId}`)
+    fetch(`https://mis372t-course-reg-backend.onrender.com/api/registrations/student/${studentId}`)
       .then(res => res.json())
       .then(data => {
         const formatted = data.map(reg => ({
@@ -27,7 +27,7 @@ export default function Schedule() {
 
   async function dropClass(enrollment_id) {
     try {
-      await fetch(`http://localhost:5000/api/registrations/${enrollment_id}`, {
+      await fetch(`https://mis372t-course-reg-backend.onrender.com/api/registrations/${enrollment_id}`, {
         method: "DELETE"
       });
 

@@ -7,7 +7,7 @@ export default function SearchCourses() {
 
   // Load all courses on mount
   useEffect(() => {
-    fetch("http://localhost:5000/api/courses")
+    fetch("https://mis372t-course-reg-backend.onrender.com/api/courses")
       .then(res => res.json())
       .then(data => {
         // convert backend → frontend format

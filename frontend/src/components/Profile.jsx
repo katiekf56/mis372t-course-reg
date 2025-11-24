@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 export default function Profile() {
   const nav = useNavigate();
-  const [user, setUser] = useState(null);   // start as null until loaded
+  const [user, setUser] = useState(null);   
   const [saving, setSaving] = useState(false);
   const studentId = localStorage.getItem("student_id");
 
@@ -14,7 +14,7 @@ export default function Profile() {
       return;
     }
 
-    fetch(`http://localhost:5000/api/students/${studentId}`)
+    fetch(`https://mis372t-course-reg-backend.onrender.com/api/students/${studentId}`)
       .then(res => res.json())
       .then(data => {
         setUser({
@@ -36,7 +36,7 @@ export default function Profile() {
     setSaving(true);
 
     try {
-      await fetch(`http://localhost:5000/api/students/${studentId}`, {
+      await fetch(`https://mis372t-course-reg-backend.onrender.com/api/students/${studentId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(user)
@@ -51,7 +51,7 @@ export default function Profile() {
   }
 
   function logout() {
-    localStorage.removeItem("student_id");  // clear student
+    localStorage.removeItem("student_id");
     nav("/");
   }
 

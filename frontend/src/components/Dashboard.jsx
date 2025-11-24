@@ -7,7 +7,7 @@ export default function Dashboard() {
   const studentId = localStorage.getItem("student_id");
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/courses")
+    fetch("https://mis372t-course-reg-backend.onrender.com/api/courses")
       .then(res => res.json())
       .then(data => {
         const formatted = data.map(c => ({
@@ -32,7 +32,7 @@ export default function Dashboard() {
     }
 
     try {
-      const res = await fetch("http://localhost:5000/api/registrations", {
+      const res = await fetch("https://mis372t-course-reg-backend.onrender.com/api/registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ student_id: studentId, course_id: c.id })
