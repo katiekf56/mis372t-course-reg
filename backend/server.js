@@ -47,6 +47,7 @@ const Student = sequelize.define('students', {
 const Course = sequelize.define('course_offerings', {
   course_id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   course_code: DataTypes.STRING,
+  department: DataTypes.STRING,
   title: DataTypes.STRING,
   professor: DataTypes.STRING,
   days: DataTypes.STRING,
@@ -64,15 +65,29 @@ const Registration = sequelize.define('registrations', {
   enrollment_id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   student_id: DataTypes.INTEGER,
   course_id: DataTypes.INTEGER,
-  date_added: { type: DataTypes.DATE, defaultValue: Sequelize.NOW }
+  date_added: { type: DataTypes.DATE, defaultValue: Sequelize.NOW },
+  status: { 
+    type: DataTypes.STRING, 
+    defaultValue: 'active',
+    validate: {
+      isIn: [['active', 'dropped', 'completed', 'pending']]
+    }
+  }
 }, { timestamps: false });
 
 // ASSOCIATIONS
 Student.hasMany(Registration, { foreignKey: 'student_id' });
 Registration.belongsTo(Student, { foreignKey: 'student_id' });
 
+
 Course.hasMany(Registration, { foreignKey: 'course_id' });
 Registration.belongsTo(Course, { foreignKey: 'course_id' });
+// SYNC DATABASE (add this temporarily)
+sequelize.sync({ alter: true }).then(() => {
+  console.log('Database synced successfully');
+}).catch(err => {
+  console.error('Database sync error:', err);
+});
 
 
 // ROUTES — STUDENTS
@@ -124,7 +139,7 @@ app.get('/api/courses/:id', async (req, res) => {
 // POST new course (AddClass.jsx)
 app.post('/api/courses', async (req, res) => {
   try {
-    const { code, title, professor, time } = req.body;
+    const { code, title, professor, time, department } = req.body;
 
     // Parse time field ("09:30-11:00")
     let time_start = null;
@@ -138,6 +153,7 @@ app.post('/api/courses', async (req, res) => {
 
     const newCourse = await Course.create({
       course_code: code,
+      department: department || "TBD",
       title,
       professor,
       days: "TBD",
@@ -165,12 +181,44 @@ app.put('/api/courses/:id', async (req, res) => {
   res.json(course);
 });
 
-// DELETE course
-app.delete('/api/courses/:id', async (req, res) => {
-  const course = await Course.findByPk(req.params.id);
-  if (!course) return res.status(404).send("Course not found");
+// TEMPORARY: Bulk update courses with departments
+app.post('/api/courses/bulk-update-departments', async (req, res) => {
+  try {
+    // Get all courses
+    const courses = await Course.findAll();
+    
+    // Update each course based on course code prefix
+    for (let course of courses) {
+      let dept = "GEN"; // default
+      
+      if (course.course_code) {
+        const code = course.course_code.toUpperCase();
+        if (code.startsWith("MIS")) dept = "MIS";
+        else if (code.startsWith("CS")) dept = "CS";
+        else if (code.startsWith("ACC")) dept = "ACC";
+        else if (code.startsWith("FIN")) dept = "FIN";
+        else if (code.startsWith("MKT")) dept = "MKT";
+        else if (code.startsWith("MGT")) dept = "MGT";
+        else if (code.startsWith("ECO")) dept = "ECO";
+        else if (code.startsWith("MATH")) dept = "MATH";
+      }
+      
+      await course.update({ department: dept });
+    }
+    
+    res.json({ message: "Departments updated successfully", count: courses.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-  await course.destroy();
+// DELETE registration
+app.delete('/api/registrations/:id', async (req, res) => {
+  const reg = await Registration.findByPk(req.params.id);
+  if (!reg) return res.status(404).send("Registration not found");
+
+  // Update status instead of deleting
+  await reg.update({ status: 'dropped' });
   res.status(204).send();
 });
 

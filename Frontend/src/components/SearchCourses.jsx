@@ -14,6 +14,7 @@ export default function SearchCourses() {
           code: c.course_code,
           title: c.title,
           prof: c.professor,
+          department: c.department || "N/A",
           time:
             (c.time_start ? c.time_start : "TBD") +
             " - " +
@@ -33,7 +34,8 @@ export default function SearchCourses() {
     const f = courses.filter(c =>
       c.code.toLowerCase().includes(lower) ||
       c.title.toLowerCase().includes(lower) ||
-      c.prof.toLowerCase().includes(lower)
+      c.prof.toLowerCase().includes(lower) ||
+      c.department.toLowerCase().includes(lower)
     );
     setFiltered(f);
   }
@@ -44,7 +46,7 @@ export default function SearchCourses() {
 
       <input
         className="input"
-        placeholder="Search by code, title, or professor"
+        placeholder="Search by code, title, professor, or department"
         value={query}
         onChange={handleSearch}
       />
@@ -56,7 +58,7 @@ export default function SearchCourses() {
               <strong>{c.code}</strong> — {c.title}
             </div>
             <div className="search-sub">
-              Prof: {c.prof} • Time: {c.time}
+              Dept: {c.department} • Prof: {c.prof} • Time: {c.time}  {/* ADD Dept */}
             </div>
           </div>
         ))}
