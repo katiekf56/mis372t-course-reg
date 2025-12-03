@@ -271,12 +271,6 @@ app.delete('/api/registrations/:id', async (req, res) => {
   res.status(204).send();
 });
 
-sequelize.sync({ alter: true }).then(() => {
-  console.log('Database synced successfully');
-}).catch(err => {
-  console.error('Database sync error:', err);
-});
-
 // START SERVER
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
