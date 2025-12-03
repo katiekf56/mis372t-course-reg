@@ -13,7 +13,7 @@ console.log('server.js loaded');
 console.log('Node version:', process.version);
 console.log('PORT:', process.env.PORT || PORT);
 
-// Surface any uncaught errors so they don't silently kill the process
+// err hndling
 process.on('unhandledRejection', (reason, p) => {
   console.error('Unhandled Rejection at Promise', p, 'reason:', reason);
 });
@@ -21,9 +21,7 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception thrown:', err);
 });
 
-// -------------------------------
 // DATABASE CONNECTION (Render PG)
-// -------------------------------
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: 'postgres',
   logging: false,
@@ -32,9 +30,7 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
   }
 });
 
-// --------------------------------
-// MODELS (matching your DB schema)
-// --------------------------------
+// MODELS 
 
 // Students Table
 const Student = sequelize.define('students', {
@@ -71,18 +67,15 @@ const Registration = sequelize.define('registrations', {
   date_added: { type: DataTypes.DATE, defaultValue: Sequelize.NOW }
 }, { timestamps: false });
 
-// -------------------------------
-// ASSOCIATIONS (needed for Cart)
-// -------------------------------
+// ASSOCIATIONS
 Student.hasMany(Registration, { foreignKey: 'student_id' });
 Registration.belongsTo(Student, { foreignKey: 'student_id' });
 
 Course.hasMany(Registration, { foreignKey: 'course_id' });
 Registration.belongsTo(Course, { foreignKey: 'course_id' });
 
-// -------------------------------
+
 // ROUTES — STUDENTS
-// -------------------------------
 
 // GET all students
 app.get('/api/students', async (req, res) => {
@@ -114,9 +107,7 @@ app.put('/api/students/:id', async (req, res) => {
   res.json(student);
 });
 
-// -------------------------------
 // ROUTES — COURSES
-// -------------------------------
 
 // GET all courses
 app.get('/api/courses', async (req, res) => {
@@ -183,9 +174,7 @@ app.delete('/api/courses/:id', async (req, res) => {
   res.status(204).send();
 });
 
-// -------------------------------
 // ROUTES — REGISTRATIONS
-// -------------------------------
 
 // GET all registrations
 app.get('/api/registrations', async (req, res) => {
@@ -230,9 +219,7 @@ app.delete('/api/registrations/:id', async (req, res) => {
   res.status(204).send();
 });
 
-// -------------------------------
 // START SERVER
-// -------------------------------
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
