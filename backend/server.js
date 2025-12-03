@@ -184,12 +184,10 @@ app.put('/api/courses/:id', async (req, res) => {
 // TEMPORARY: Bulk update courses with departments
 app.post('/api/courses/bulk-update-departments', async (req, res) => {
   try {
-    // Get all courses
     const courses = await Course.findAll();
     
-    // Update each course based on course code prefix
     for (let course of courses) {
-      let dept = "GEN"; // default
+      let dept = "GEN";
       
       if (course.course_code) {
         const code = course.course_code.toUpperCase();
@@ -212,12 +210,10 @@ app.post('/api/courses/bulk-update-departments', async (req, res) => {
   }
 });
 
-// DELETE registration
+// DELETE registration (updates status to "dropped" instead of deleting)
 app.delete('/api/registrations/:id', async (req, res) => {
   const reg = await Registration.findByPk(req.params.id);
   if (!reg) return res.status(404).send("Registration not found");
-
-  // Update status instead of deleting
   await reg.update({ status: 'dropped' });
   res.status(204).send();
 });
@@ -243,17 +239,25 @@ app.get('/api/registrations/student/:student_id', async (req, res) => {
 app.post('/api/registrations', async (req, res) => {
   const { student_id, course_id } = req.body;
 
-  // Check for existing registration
+  // Check for existing registration with 'added' status only
   const existing = await Registration.findOne({
-    where: { student_id, course_id }
+    where: { 
+      student_id, 
+      course_id,
+      status: 'added'
+    }
   });
 
   if (existing) {
     return res.status(400).json({ error: "Already registered for this course" });
   }
 
-  // Create new registration
-  const newReg = await Registration.create({ student_id, course_id });
+  // Create new registration with 'added' status
+  const newReg = await Registration.create({ 
+    student_id, 
+    course_id,
+    status: 'added'
+  });
   res.status(201).json(newReg);
 });
 

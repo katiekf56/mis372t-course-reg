@@ -10,7 +10,9 @@ export default function Schedule() {
     fetch(`https://mis372t-course-reg-backend.onrender.com/api/registrations/student/${studentId}`)
       .then(res => res.json())
       .then(data => {
-        const formatted = data.map(reg => ({
+        const activeRegistrations = data.filter(reg => reg.status === 'added' || !reg.status);
+        
+        const formatted = activeRegistrations.map(reg => ({
           enrollment_id: reg.enrollment_id,
           code: reg.course_offering.course_code,
           title: reg.course_offering.title,
