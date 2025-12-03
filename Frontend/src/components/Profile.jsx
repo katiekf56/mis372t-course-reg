@@ -82,11 +82,27 @@ export default function Profile() {
       />
 
       <label>Major</label>
-      <input
+      <select
         className="input"
         value={form.major}
         onChange={(e) => update("major", e.target.value)}
-      />
+      >
+        <option value="">Select Major</option>
+        <option>Management Information Systems (MIS)</option>
+        <option>Computer Science</option>
+        <option>Business Administration</option>
+        <option>Finance</option>
+        <option>Marketing</option>
+        <option>Accounting</option>
+        <option>Economics</option>
+        <option>Mechanical Engineering</option>
+        <option>Electrical & Computer Engineering</option>
+        <option>Civil Engineering</option>
+        <option>Psychology</option>
+        <option>Biology</option>
+        <option>Government</option>
+        <option>Communications & Media Studies</option>
+      </select>
 
       <label>Classification</label>
       <select
