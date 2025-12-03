@@ -4,10 +4,7 @@ import cors from 'cors';
 import { Sequelize, DataTypes } from 'sequelize';
 
 const app = express();
-app.use(cors({
-  origin: ['http://localhost:5173', 'https://mis372t-course-reg.onrender.com'],
-  credentials: true
-}));
+app.use(cors());
 app.use(express.json());
 const PORT = process.env.PORT || 5000;
 
