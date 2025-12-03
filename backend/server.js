@@ -4,7 +4,10 @@ import cors from 'cors';
 import { Sequelize, DataTypes } from 'sequelize';
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:5173', 'https://mis372t-course-reg.onrender.com'],
+  credentials: true
+}));
 app.use(express.json());
 const PORT = process.env.PORT || 5000;
 
@@ -269,6 +272,12 @@ app.delete('/api/registrations/:id', async (req, res) => {
 
   await reg.destroy();
   res.status(204).send();
+});
+
+sequelize.sync({ alter: true }).then(() => {
+  console.log('Database synced successfully');
+}).catch(err => {
+  console.error('Database sync error:', err);
 });
 
 // START SERVER
