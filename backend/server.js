@@ -97,18 +97,6 @@ sequelize.sync().then(() => {
 
 // ROUTES — STUDENTS
 
-// GET all students
-app.get('/api/students', async (req, res) => {
-  const rows = await Student.findAll();
-  res.json(rows);
-});
-
-// GET student by ID
-app.get('/api/students/:id', async (req, res) => {
-  const row = await Student.findByPk(req.params.id);
-  row ? res.json(row) : res.status(404).send("Student not found");
-});
-
 // GET student by email (Login.jsx)
 app.get('/api/students/email/:email', async (req, res) => {
   const student = await Student.findOne({ where: { email: req.params.email } });
@@ -225,24 +213,12 @@ app.delete('/api/registrations/:id', async (req, res) => {
 
 // ROUTES — REGISTRATIONS
 
-// GET all registrations
-app.get('/api/registrations', async (req, res) => {
-  const rows = await Registration.findAll();
-  res.json(rows);
-});
-
-// GET registrations for specific student (Cart.jsx)
+// GET registrations for specific student 
 app.get('/api/registrations/student/:student_id', async (req, res) => {
   const rows = await Registration.findAll({
     where: { student_id: req.params.student_id },
     include: [{ model: Course }]
   });
-  res.json(rows);
-});
-
-// Check registration statuses
-app.get('/api/registrations/check-status', async (req, res) => {
-  const rows = await Registration.findAll();
   res.json(rows);
 });
 
