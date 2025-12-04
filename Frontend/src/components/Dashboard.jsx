@@ -4,6 +4,7 @@ import bannerImg from "../UT-Full-Stack-Image.avif";
 
 export default function Dashboard() {
   const [courses, setCourses] = useState([]);
+  const [eligibility, setEligibility] = useState({});
   const [aiQuery, setAiQuery] = useState("");
   const [aiResponse, setAiResponse] = useState("");
 
@@ -28,27 +29,113 @@ export default function Dashboard() {
   }
 
   // -----------------------------
+  // PARSE PREREQUISITES FOR DISPLAY
+  // -----------------------------
+  async function getPrerequisiteNames(prereqString) {
+    if (!prereqString || prereqString === "None") return "None";
+    
+    try {
+      // Prerequisites are stored as comma-separated course_ids: "1,2,3"
+      const prereqIds = prereqString.split(',').map(id => id.trim());
+      const courseNames = [];
+      
+      for (const id of prereqIds) {
+        const res = await fetch(`${API}/api/courses/${id}`);
+        if (res.ok) {
+          const course = await res.json();
+          courseNames.push(course.course_code);
+        }
+      }
+      
+      return courseNames.length > 0 ? courseNames.join(', ') : "None";
+    } catch (err) {
+      console.error("Error fetching prerequisite names:", err);
+      return prereqString;
+    }
+  }
+
+  // -----------------------------
+  // CHECK ELIGIBILITY FOR ALL COURSES
+  // -----------------------------
+  async function checkAllEligibility(courseList) {
+    if (!studentId) return;
+
+    const eligibilityData = {};
+
+    for (const course of courseList) {
+      try {
+        const res = await fetch(
+          `${API}/api/courses/${course.id}/eligibility/${studentId}`
+        );
+        const data = await res.json();
+        eligibilityData[course.id] = data;
+      } catch (err) {
+        console.error(`Error checking eligibility for course ${course.id}:`, err);
+        eligibilityData[course.id] = { eligible: true }; 
+      }
+    }
+
+    setEligibility(eligibilityData);
+  }
+
+  // -----------------------------
   // FETCH COURSES
   // -----------------------------
   useEffect(() => {
-    fetch(`${API}/api/courses`)
-      .then((res) => res.json())
-      .then((data) => {
-        const formatted = data.map((c) => ({
-          id: c.course_id,
-          code: c.course_code,
-          title: c.title,
-          prof: c.professor,
-          time: `${formatTime(c.time_start)} - ${formatTime(c.time_end)}`,
-          department: c.department || "N/A",
-          days: c.days || "TBD",
-          prerequisites: c.prerequisites || "None",
-          majorRestricted: c.major_restricted || "None"
-        }));
+    async function loadCourses() {
+      try {
+        const res = await fetch(`${API}/api/courses`);
+        const data = await res.json();
+        
+        const formatted = await Promise.all(
+          data.map(async (c) => ({
+            id: c.course_id,
+            code: c.course_code,
+            title: c.title,
+            prof: c.professor,
+            time: `${formatTime(c.time_start)} - ${formatTime(c.time_end)}`,
+            department: c.department || "N/A",
+            days: c.days || "TBD",
+            prerequisites: await getPrerequisiteNames(c.prerequisites),
+            prerequisitesRaw: c.prerequisites,
+            majorRestricted: c.major_restricted || "None"
+          }))
+        );
+        
         setCourses(formatted);
-      })
-      .catch((err) => console.log(err));
-  }, []);
+        await checkAllEligibility(formatted);
+      } catch (err) {
+        console.error("Error loading courses:", err);
+      }
+    }
+
+    loadCourses();
+  }, [studentId]);
+
+  // -----------------------------
+  // GET ELIGIBILITY STATUS MESSAGE
+  // -----------------------------
+  function getEligibilityMessage(courseId) {
+    const elig = eligibility[courseId];
+    if (!elig) return null;
+
+    if (elig.eligible) return null;
+
+    const messages = [];
+
+    // Check prerequisite issues
+    if (elig.prerequisite_check && !elig.prerequisite_check.valid) {
+      messages.push(`Missing: ${elig.prerequisite_check.missing.join(', ')}`);
+    }
+
+    // Check major restriction issues
+    if (elig.major_check && !elig.major_check.valid) {
+      const majors = elig.major_check.required_majors.join(', ');
+      messages.push(`Restricted to ${majors} majors`);
+    }
+
+    return messages.join(' | ');
+  }
 
   // -----------------------------
   // REGISTER FOR CLASS
@@ -58,6 +145,14 @@ export default function Dashboard() {
 
     if (!studentId) {
       alert("You must be logged in.");
+      return;
+    }
+
+    // Check eligibility before attempting to register
+    const elig = eligibility[c.id];
+    if (elig && !elig.eligible) {
+      const message = getEligibilityMessage(c.id);
+      alert(`Cannot register:\n${message}`);
       return;
     }
 
@@ -81,7 +176,8 @@ export default function Dashboard() {
       console.log("Response:", data);
 
       if (!res.ok) {
-        alert(data.error || "Could not add class.");
+        // Show the detailed error message from backend
+        alert(data.details || data.error || "Could not add class.");
         return;
       }
 
@@ -103,31 +199,27 @@ export default function Dashboard() {
     const apiKey = import.meta.env.VITE_AZURE_API_KEY;
     const deployment = import.meta.env.VITE_AZURE_DEPLOYMENT;
 
-    // Defensive: ensure endpoint and deployment are present
     if (!endpoint || !apiKey || !deployment) {
       console.error('AI config missing: endpoint, apiKey, or deployment not set');
       setAiResponse('AI configuration missing. Check VITE_AZURE_* env variables.');
       return;
     }
 
-    // Normalize endpoint so we don't accidentally concatenate without a slash
     const base = endpoint.replace(/\/$/, '');
     const url = `${base}/openai/deployments/${deployment}/chat/completions?api-version=2024-08-01-preview`;
 
     try {
-      const res = await fetch(url,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "api-key": apiKey
-          },
-          body: JSON.stringify({
-            messages: [{ role: "user", content: aiQuery }],
-            max_tokens: 200
-          })
-        }
-      );
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": apiKey
+        },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: aiQuery }],
+          max_tokens: 200
+        })
+      });
 
       const data = await res.json();
       setAiResponse(data?.choices?.[0]?.message?.content || "No response.");
@@ -201,26 +293,55 @@ export default function Dashboard() {
           </thead>
 
           <tbody>
-            {courses.map((c) => (
-              <tr key={c.id}>
-                <td>{c.code}</td>
-                <td>{c.title}</td>
-                <td>{c.department}</td>
-                <td>{c.prof}</td>
-                <td>{c.days}</td>
-                <td>{c.time}</td>
-                <td>{c.prerequisites}</td>
-                <td>{c.majorRestricted}</td>
-                <td>
-                  <button
-                    className="btn-orange small"
-                    onClick={() => register(c)}
-                  >
-                    Add
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {courses.map((c) => {
+              const elig = eligibility[c.id];
+              const isEligible = !elig || elig.eligible;
+              const message = getEligibilityMessage(c.id);
+
+              return (
+                <tr 
+                  key={c.id}
+                  style={!isEligible ? { backgroundColor: '#fff3cd' } : {}}
+                >
+                  <td>{c.code}</td>
+                  <td>{c.title}</td>
+                  <td>{c.department}</td>
+                  <td>{c.prof}</td>
+                  <td>{c.days}</td>
+                  <td>{c.time}</td>
+                  <td>{c.prerequisites}</td>
+                  <td>{c.majorRestricted}</td>
+                  <td>
+                    {isEligible ? (
+                      <button
+                        className="btn-orange small"
+                        onClick={() => register(c)}
+                      >
+                        Add
+                      </button>
+                    ) : (
+                      <div style={{ fontSize: '12px', color: '#856404' }}>
+                        <button
+                          className="btn-orange small"
+                          disabled
+                          style={{ 
+                            opacity: 0.5, 
+                            cursor: 'not-allowed',
+                            backgroundColor: '#ccc'
+                          }}
+                          title={message}
+                        >
+                          Ineligible
+                        </button>
+                        <div style={{ marginTop: '4px', whiteSpace: 'nowrap' }}>
+                          {message}
+                        </div>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
