@@ -57,7 +57,9 @@ const Course = sequelize.define('course_offerings', {
   capacity: { type: DataTypes.INTEGER, defaultValue: 30 },
   seats_available: { type: DataTypes.INTEGER, defaultValue: 30 },
   semester: DataTypes.STRING,
-  year: DataTypes.INTEGER
+  year: DataTypes.INTEGER,
+  prerequisites: DataTypes.STRING,
+  major_restricted: DataTypes.STRING 
 }, { timestamps: false });
 
 // Registrations Table
@@ -286,6 +288,6 @@ sequelize.sync().then(() => {
 });
 
 // START SERVER
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });

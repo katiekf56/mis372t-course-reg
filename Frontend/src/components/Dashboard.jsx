@@ -39,7 +39,11 @@ export default function Dashboard() {
           code: c.course_code,
           title: c.title,
           prof: c.professor,
-          time: `${formatTime(c.time_start)} - ${formatTime(c.time_end)}`
+          time: `${formatTime(c.time_start)} - ${formatTime(c.time_end)}`,
+          department: c.department || "N/A",
+          days: c.days || "TBD",
+          prerequisites: c.prerequisites || "None",
+          majorRestricted: c.major_restricted || "None"
         }));
         setCourses(formatted);
       })
@@ -186,8 +190,12 @@ export default function Dashboard() {
             <tr>
               <th>Course</th>
               <th>Title</th>
+              <th>Dept</th>
               <th>Professor</th>
+              <th>Days</th>
               <th>Time</th>
+              <th>Prerequisites</th>
+              <th>Major Restricted</th>
               <th></th>
             </tr>
           </thead>
@@ -197,8 +205,12 @@ export default function Dashboard() {
               <tr key={c.id}>
                 <td>{c.code}</td>
                 <td>{c.title}</td>
+                <td>{c.department}</td>
                 <td>{c.prof}</td>
+                <td>{c.days}</td>
                 <td>{c.time}</td>
+                <td>{c.prerequisites}</td>
+                <td>{c.majorRestricted}</td>
                 <td>
                   <button
                     className="btn-orange small"
