@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 export default function Schedule() {
   const [classes, setClasses] = useState([]);
   const studentId = localStorage.getItem("student_id");
-  const API = import.meta.env.VITE_API_BASE || "http://localhost:5000";
+  const API = import.meta.env.VITE_API_BASE || "http://localhost:5001";
 
   // ----------------------------
   // FORMAT TIME → "4:00 PM"

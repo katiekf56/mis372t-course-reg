@@ -9,7 +9,7 @@ export default function Dashboard() {
 
   const nav = useNavigate();
   const studentId = localStorage.getItem("student_id");
-  const API = import.meta.env.VITE_API_BASE || "http://localhost:5000";
+  const API = import.meta.env.VITE_API_BASE || "http://localhost:5001";
 
   // -----------------------------
   // FORMAT TIME → "4:00 PM"
@@ -99,9 +99,19 @@ export default function Dashboard() {
     const apiKey = import.meta.env.VITE_AZURE_API_KEY;
     const deployment = import.meta.env.VITE_AZURE_DEPLOYMENT;
 
+    // Defensive: ensure endpoint and deployment are present
+    if (!endpoint || !apiKey || !deployment) {
+      console.error('AI config missing: endpoint, apiKey, or deployment not set');
+      setAiResponse('AI configuration missing. Check VITE_AZURE_* env variables.');
+      return;
+    }
+
+    // Normalize endpoint so we don't accidentally concatenate without a slash
+    const base = endpoint.replace(/\/$/, '');
+    const url = `${base}/openai/deployments/${deployment}/chat/completions?api-version=2024-08-01-preview`;
+
     try {
-      const res = await fetch(
-        `${endpoint}openai/deployments/${deployment}/chat/completions?api-version=2024-08-01-preview`,
+      const res = await fetch(url,
         {
           method: "POST",
           headers: {

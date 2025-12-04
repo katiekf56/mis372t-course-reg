@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from '../firebase';
-const API = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
+const API = import.meta.env.VITE_API_BASE || 'http://localhost:5001';
 
 export default function Login() {
   const nav = useNavigate();

@@ -6,7 +6,7 @@ import { Sequelize, DataTypes } from 'sequelize';
 const app = express();
 app.use(cors());
 app.use(express.json());
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Quick runtime/debug logs to help diagnose silent starts
 console.log('server.js loaded');
