@@ -240,6 +240,12 @@ app.get('/api/registrations/student/:student_id', async (req, res) => {
   res.json(rows);
 });
 
+// Check registration statuses
+app.get('/api/registrations/check-status', async (req, res) => {
+  const rows = await Registration.findAll();
+  res.json(rows);
+});
+
 // POST new registration (prevent duplicates)
 app.post('/api/registrations', async (req, res) => {
   console.log("POST /api/registrations HIT");
