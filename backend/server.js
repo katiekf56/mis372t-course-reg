@@ -70,7 +70,9 @@ const Registration = sequelize.define('registrations', {
     type: DataTypes.STRING, 
     defaultValue: 'active',
     validate: {
-      isIn: [['active', 'dropped', 'completed', 'pending']]
+      // include 'added' because the frontend currently creates registrations
+      // with status 'added' when the dashboard Add button is used.
+      isIn: [['active', 'dropped', 'completed', 'pending', 'added']]
     }
   }
 }, { timestamps: false });
@@ -83,8 +85,11 @@ Registration.belongsTo(Student, { foreignKey: 'student_id' });
 Course.hasMany(Registration, { foreignKey: 'course_id' });
 Registration.belongsTo(Course, { foreignKey: 'course_id' });
 // SYNC DATABASE (add this temporarily)
-sequelize.sync({ alter: true }).then(() => {
-  console.log('Database synced successfully');
+// NOTE: removed `alter: true` to avoid attempts to alter columns
+// that may be used by views/rules in the production database.
+// Use migrations when schema changes are required.
+sequelize.sync().then(() => {
+  console.log('Database synced successfully (no alter)');
 }).catch(err => {
   console.error('Database sync error:', err);
 });
@@ -237,29 +242,47 @@ app.get('/api/registrations/student/:student_id', async (req, res) => {
 
 // POST new registration (prevent duplicates)
 app.post('/api/registrations', async (req, res) => {
-  const { student_id, course_id } = req.body;
+  console.log("POST /api/registrations HIT");
+  console.log("BODY:", req.body);
 
-  // Check for existing registration with 'added' status only
-  const existing = await Registration.findOne({
-    where: { 
-      student_id, 
-      course_id,
-      status: 'added'
+  try {
+    const { student_id, course_id } = req.body;
+
+    console.log("Checking for existing registration…");
+
+    const existing = await Registration.findOne({
+      where: { 
+        student_id,
+        course_id,
+        status: 'added'
+      }
+    });
+
+    console.log("Existing reg:", existing);
+
+    if (existing) {
+      console.log("Already registered.");
+      return res.status(400).json({ error: "Already registered for this course" });
     }
-  });
 
-  if (existing) {
-    return res.status(400).json({ error: "Already registered for this course" });
+    console.log("Creating new registration…");
+
+    const newReg = await Registration.create({ 
+      student_id, 
+      course_id, 
+      status: "added" 
+    });
+
+    console.log("CREATED:", newReg);
+
+    res.status(201).json(newReg);
+  } 
+  catch (err) {
+    console.error("REGISTRATION ERROR:", err);
+    res.status(500).json({ error: err.message });
   }
-
-  // Create new registration with 'added' status
-  const newReg = await Registration.create({ 
-    student_id, 
-    course_id,
-    status: 'added'
-  });
-  res.status(201).json(newReg);
 });
+
 
 
 // DELETE registration
@@ -271,8 +294,11 @@ app.delete('/api/registrations/:id', async (req, res) => {
   res.status(204).send();
 });
 
-sequelize.sync({ alter: true }).then(() => {
-  console.log('Database synced successfully');
+// NOTE: removed `alter: true` to avoid attempts to alter columns
+// that may be used by views/rules in the production database.
+// Use migrations when schema changes are required.
+sequelize.sync().then(() => {
+  console.log('Database synced successfully (no alter)');
 }).catch(err => {
   console.error('Database sync error:', err);
 });

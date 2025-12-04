@@ -20,7 +20,7 @@ body {
 .banner {
   position: relative;
   width: 100%;
-  height: 100px;
+  height: 140px;
   overflow: hidden;
   margin-bottom: 20px;
   border-bottom-left-radius: 8px;
@@ -37,22 +37,24 @@ body {
 
 .banner-title {
   position: absolute;
-  left: 12px;
-  top: 25%;
+  left: 24px;
+  top: 50%;
   transform: translateY(-50%);
   color: white;
-  font-size: 30px;
-  font-weight: 600;
+  font-size: 36px;
+  font-weight: 700;
   text-shadow: 0px 3px 8px rgba(0,0,0,0.6);
 }
 
 /* Layout */
 
 .container {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 20px;
+  max-width: 1200px;
+  margin: 24px auto;
+  padding: 28px;
   background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
 }
 
 .page-title {
@@ -86,6 +88,8 @@ body {
   font-size: 14px;
 }
 
+.btn-orange:hover { transform: translateY(-1px); box-shadow: 0 6px 12px rgba(191,87,0,0.18); }
+
 .btn-orange.small {
   padding: 6px 10px;
 }
@@ -98,6 +102,8 @@ body {
   border-radius: 6px;
   cursor: pointer;
 }
+
+.btn-danger:hover { transform: translateY(-1px); box-shadow: 0 6px 12px rgba(163,0,0,0.16); }
 
 /* Inputs */
 
@@ -130,6 +136,11 @@ body {
   text-align: left;
 }
 
+.table th { background: #faf6f2; font-weight: 600; }
+.table tbody tr:hover { background: #fbfbfb; }
+
+.table .small-muted { color: #666; font-size: 13px; }
+
 /* Login */
 
 .login-page {
@@ -146,6 +157,11 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   width: 350px;
 }
+
+/* Desktop-first layout helpers */
+.row { display: flex; gap: 20px; align-items: flex-start; }
+.col { flex: 1; }
+.sidebar { width: 320px; }
 
 .login-card .page-title {
   text-align: center;
@@ -213,6 +229,8 @@ body {
   gap: 12px;
 }
 
+.profile-card .input, .profile-card select { max-width: 100%; }
+
 .logout-btn {
   background-color: #c62828; /* red */
   color: white;
@@ -258,6 +276,8 @@ body {
   flex-direction: column;
   gap: 12px;
 }
+
+.ai-box .ai-input { max-width: 100%; }
 
 .ai-input {
   width: 100%;

@@ -20,3 +20,6 @@ VALUES
 (3, 2);
 
 SELECT * FROM students;
+
+ALTER TABLE registrations
+ADD COLUMN status VARCHAR(20) DEFAULT 'active';

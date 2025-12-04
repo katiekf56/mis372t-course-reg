@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'; 
+const API = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
 
 export default function AddClass() {
   const [form, setForm] = useState({
@@ -14,15 +15,17 @@ export default function AddClass() {
 
   async function saveClass() {
     try {
-      const res = await fetch("https://mis372t-course-reg-backend.onrender.com/api/courses", {
+      const res = await fetch(`${API}/api/courses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form)
       });
+
       if (!res.ok) {
         alert("Error saving class.");
         return;
       }
+
       alert("Class saved (demo).");
     } catch (err) {
       console.error(err);

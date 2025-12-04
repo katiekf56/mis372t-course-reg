@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from '../firebase';
+const API = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
 
 export default function Login() {
   const nav = useNavigate();
@@ -23,9 +24,9 @@ export default function Login() {
       console.log("Login successful!", userCredential.user);
 
       // Lookup student in backend by email
-      const res = await fetch(
-        `https://mis372t-course-reg-backend.onrender.com/api/students/email/${email}`
-      );
+        const res = await fetch(
+          `${API}/api/students/email/${email}`
+        );
       const data = await res.json();
 
       if (!data || !data.student_id) {

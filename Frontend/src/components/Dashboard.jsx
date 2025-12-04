@@ -9,52 +9,72 @@ export default function Dashboard() {
 
   const nav = useNavigate();
   const studentId = localStorage.getItem("student_id");
+  const API = import.meta.env.VITE_API_BASE || "http://localhost:5000";
+
+  // -----------------------------
+  // FORMAT TIME → "4:00 PM"
+  // -----------------------------
+  function formatTime(t) {
+    if (!t) return "TBD";
+
+    let [h, m] = t.split(":");
+    h = Number(h);
+    m = Number(m);
+
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+
+    return `${h12}:${m.toString().padStart(2, "0")} ${ampm}`;
+  }
 
   // -----------------------------
   // FETCH COURSES
   // -----------------------------
   useEffect(() => {
-    fetch("https://mis372t-course-reg-backend.onrender.com/api/courses")
-      .then(res => res.json())
-      .then(data => {
-        const formatted = data.map(c => ({
+    fetch(`${API}/api/courses`)
+      .then((res) => res.json())
+      .then((data) => {
+        const formatted = data.map((c) => ({
           id: c.course_id,
           code: c.course_code,
           title: c.title,
           prof: c.professor,
-          time:
-            (c.time_start || "TBD") +
-            " - " +
-            (c.time_end || "TBD")
+          time: `${formatTime(c.time_start)} - ${formatTime(c.time_end)}`
         }));
         setCourses(formatted);
       })
-      .catch(err => console.log(err));
+      .catch((err) => console.log(err));
   }, []);
 
   // -----------------------------
   // REGISTER FOR CLASS
   // -----------------------------
   async function register(c) {
+    console.log("REGISTER CLICKED:", c);
+
     if (!studentId) {
       alert("You must be logged in.");
       return;
     }
 
     try {
-      const res = await fetch(
-        "https://mis372t-course-reg-backend.onrender.com/api/registrations",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            student_id: studentId,
-            course_id: c.id
-          })
-        }
-      );
+      console.log("Sending POST:", `${API}/api/registrations`);
+      console.log("Payload:", {
+        student_id: Number(studentId),
+        course_id: Number(c.id)
+      });
+
+      const res = await fetch(`${API}/api/registrations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          student_id: Number(studentId),
+          course_id: Number(c.id)
+        })
+      });
 
       const data = await res.json();
+      console.log("Response:", data);
 
       if (!res.ok) {
         alert(data.error || "Could not add class.");
@@ -62,14 +82,15 @@ export default function Dashboard() {
       }
 
       alert("Class added to your schedule!");
+      window.dispatchEvent(new Event("registrationsChanged"));
     } catch (err) {
-      console.error(err);
+      console.error("REGISTER ERROR:", err);
       alert("Error adding class.");
     }
   }
 
   // -----------------------------
-  // AI QUERY HANDLER (Azure OpenAI)
+  // AI QUERY HANDLER
   // -----------------------------
   async function askAI() {
     if (!aiQuery.trim()) return;
@@ -88,22 +109,17 @@ export default function Dashboard() {
             "api-key": apiKey
           },
           body: JSON.stringify({
-            messages: [
-              { role: "user", content: aiQuery }
-            ],
+            messages: [{ role: "user", content: aiQuery }],
             max_tokens: 200
           })
         }
       );
 
       const data = await res.json();
-
-      setAiResponse(
-        data?.choices?.[0]?.message?.content || "No response generated."
-      );
+      setAiResponse(data?.choices?.[0]?.message?.content || "No response.");
     } catch (err) {
       console.error(err);
-      setAiResponse("AI service error — check console.");
+      setAiResponse("AI service error.");
     }
   }
 
@@ -138,14 +154,11 @@ export default function Dashboard() {
         <div className="ai-box">
           <input
             className="input ai-input"
-            placeholder="Ask the AI anything about courses…"
+            placeholder="Ask the AI anything…"
             value={aiQuery}
             onChange={(e) => setAiQuery(e.target.value)}
           />
-
-          <button className="btn-orange" onClick={askAI}>
-            Ask AI
-          </button>
+          <button className="btn-orange" onClick={askAI}>Ask AI</button>
 
           {aiResponse && (
             <div className="ai-response">
@@ -170,14 +183,17 @@ export default function Dashboard() {
           </thead>
 
           <tbody>
-            {courses.map(c => (
+            {courses.map((c) => (
               <tr key={c.id}>
                 <td>{c.code}</td>
                 <td>{c.title}</td>
                 <td>{c.prof}</td>
                 <td>{c.time}</td>
                 <td>
-                  <button className="btn-orange small" onClick={() => register(c)}>
+                  <button
+                    className="btn-orange small"
+                    onClick={() => register(c)}
+                  >
                     Add
                   </button>
                 </td>

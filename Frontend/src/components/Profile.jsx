@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
+const API = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
+
 export default function Profile() {
   const [form, setForm] = useState({
     name: "",
@@ -20,7 +22,7 @@ export default function Profile() {
   useEffect(() => {
     if (!studentId) return;
 
-    fetch(`https://mis372t-course-reg-backend.onrender.com/api/students/${studentId}`)
+    fetch(`${API}/api/students/${studentId}`)
       .then((res) => res.json())
       .then((data) =>
         setForm({
@@ -36,14 +38,11 @@ export default function Profile() {
   // Save Profile
   async function saveProfile() {
     try {
-      const res = await fetch(
-        `https://mis372t-course-reg-backend.onrender.com/api/students/${studentId}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        }
-      );
+      const res = await fetch(`${API}/api/students/${studentId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
 
       if (!res.ok) {
         alert("Error saving profile.");
