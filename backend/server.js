@@ -72,8 +72,6 @@ const Registration = sequelize.define('registrations', {
     type: DataTypes.STRING, 
     defaultValue: 'active',
     validate: {
-      // include 'added' because the frontend currently creates registrations
-      // with status 'added' when the dashboard Add button is used.
       isIn: [['active', 'dropped', 'completed', 'pending', 'added']]
     }
   }
@@ -83,23 +81,21 @@ const Registration = sequelize.define('registrations', {
 Student.hasMany(Registration, { foreignKey: 'student_id' });
 Registration.belongsTo(Student, { foreignKey: 'student_id' });
 
-
 Course.hasMany(Registration, { foreignKey: 'course_id' });
 Registration.belongsTo(Course, { foreignKey: 'course_id' });
-// SYNC DATABASE (add this temporarily)
-// NOTE: removed `alter: true` to avoid attempts to alter columns
-// that may be used by views/rules in the production database.
-// Use migrations when schema changes are required.
+
+// SYNC DATABASE
 sequelize.sync().then(() => {
   console.log('Database synced successfully (no alter)');
 }).catch(err => {
   console.error('Database sync error:', err);
 });
 
-
+// ============================================
 // ROUTES — STUDENTS
+// ============================================
 
-// GET student by ID -- checking if student info saved
+// GET student by ID
 app.get('/api/students/:id', async (req, res) => {
   const student = await Student.findByPk(req.params.id);
   if (!student) {
@@ -130,7 +126,9 @@ app.put('/api/students/:id', async (req, res) => {
   res.json(student);
 });
 
+// ============================================
 // ROUTES — COURSES
+// ============================================
 
 // GET all courses
 app.get('/api/courses', async (req, res) => {
@@ -218,15 +216,163 @@ app.post('/api/courses/bulk-update-departments', async (req, res) => {
   }
 });
 
-// DELETE registration (updates status to "dropped" instead of deleting)
-app.delete('/api/registrations/:id', async (req, res) => {
-  const reg = await Registration.findByPk(req.params.id);
-  if (!reg) return res.status(404).send("Registration not found");
-  await reg.update({ status: 'dropped' });
-  res.status(204).send();
+// ============================================
+// CHECK ELIGIBILITY for a course
+// ============================================
+app.get('/api/courses/:course_id/eligibility/:student_id', async (req, res) => {
+  try {
+    const { course_id, student_id } = req.params;
+    
+    // Get student info
+    const student = await Student.findByPk(student_id);
+    if (!student) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    // Get course info
+    const course = await Course.findByPk(course_id);
+    if (!course) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    // Get student's current registrations
+    const studentRegistrations = await Registration.findAll({
+      where: { 
+        student_id,
+        status: 'added'
+      },
+      include: [{ model: Course }]
+    });
+
+    let eligible = true;
+    const checks = {
+      prerequisite_check: { valid: true, missing: [] },
+      major_check: { valid: true, required_majors: [] },
+      time_conflict_check: { valid: true, conflicts: [] }
+    };
+
+    // ===== 1. CHECK PREREQUISITES =====
+    if (course.prerequisites && course.prerequisites !== "None") {
+      const requiredCourseIds = course.prerequisites.split(',').map(id => id.trim());
+      
+      // Get all courses the student has completed
+      const completedCourses = studentRegistrations.map(reg => reg.course_id.toString());
+      
+      const missingPrereqs = [];
+      for (const reqId of requiredCourseIds) {
+        if (!completedCourses.includes(reqId)) {
+          // Get course code for display
+          const reqCourse = await Course.findByPk(reqId);
+          if (reqCourse) {
+            missingPrereqs.push(reqCourse.course_code);
+          }
+        }
+      }
+      
+      if (missingPrereqs.length > 0) {
+        eligible = false;
+        checks.prerequisite_check = {
+          valid: false,
+          missing: missingPrereqs
+        };
+      }
+    }
+
+    // ===== 2. CHECK MAJOR RESTRICTIONS =====
+    if (course.major_restricted && course.major_restricted !== "None") {
+      const allowedMajors = course.major_restricted.split(',').map(m => m.trim().toUpperCase());
+      
+      // Map full major names to abbreviations
+      const majorMap = {
+        'MANAGEMENT INFORMATION SYSTEMS (MIS)': 'MIS',
+        'COMPUTER SCIENCE': 'CS',
+        'BUSINESS ADMINISTRATION': 'BA',
+        'FINANCE': 'FIN',
+        'MARKETING': 'MKT',
+        'ACCOUNTING': 'ACC',
+        'ECONOMICS': 'ECO',
+        'MECHANICAL ENGINEERING': 'ME',
+        'ELECTRICAL & COMPUTER ENGINEERING': 'ECE',
+        'CIVIL ENGINEERING': 'CE',
+        'PSYCHOLOGY': 'PSY',
+        'BIOLOGY': 'BIO',
+        'GOVERNMENT': 'GOV',
+        'COMMUNICATIONS & MEDIA STUDIES': 'CMS'
+      };
+      
+      const studentMajorUpper = (student.major || '').toUpperCase();
+      const studentMajorAbbrev = majorMap[studentMajorUpper] || studentMajorUpper;
+      
+      // Check if student's major (or its abbreviation) is in the allowed list
+      const isAllowed = allowedMajors.some(major => 
+        major === studentMajorAbbrev || 
+        major === studentMajorUpper ||
+        studentMajorUpper.includes(major)
+      );
+      
+      if (!isAllowed) {
+        eligible = false;
+        checks.major_check = {
+          valid: false,
+          required_majors: allowedMajors,
+          student_major: studentMajorAbbrev
+        };
+      }
+    }
+
+    // ===== 3. CHECK TIME CONFLICTS =====
+    if (course.time_start && course.time_end && course.days && course.days !== "TBD") {
+      const courseDays = course.days.split('');
+      
+      for (const reg of studentRegistrations) {
+        const enrolledCourse = reg.course_offering;
+        
+        // Skip if enrolled course has no time info
+        if (!enrolledCourse.time_start || !enrolledCourse.time_end || 
+            !enrolledCourse.days || enrolledCourse.days === "TBD") {
+          continue;
+        }
+        
+        const enrolledDays = enrolledCourse.days.split('');
+        
+        // Check if courses share any days
+        const sharedDays = courseDays.filter(day => enrolledDays.includes(day));
+        
+        if (sharedDays.length > 0) {
+          // Check if times overlap
+          const courseStart = course.time_start;
+          const courseEnd = course.time_end;
+          const enrolledStart = enrolledCourse.time_start;
+          const enrolledEnd = enrolledCourse.time_end;
+          
+          // Times overlap if: (start1 < end2) AND (start2 < end1)
+          if (courseStart < enrolledEnd && enrolledStart < courseEnd) {
+            eligible = false;
+            checks.time_conflict_check.valid = false;
+            checks.time_conflict_check.conflicts.push({
+              course_code: enrolledCourse.course_code,
+              days: sharedDays.join(''),
+              time: `${enrolledStart} - ${enrolledEnd}`
+            });
+          }
+        }
+      }
+    }
+
+    res.json({
+      eligible,
+      ...checks
+    });
+
+  } catch (err) {
+    console.error("Eligibility check error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
+// ============================================
 // ROUTES — REGISTRATIONS
+// ============================================
 
 // GET registrations for specific student 
 app.get('/api/registrations/student/:student_id', async (req, res) => {
@@ -237,7 +383,7 @@ app.get('/api/registrations/student/:student_id', async (req, res) => {
   res.json(rows);
 });
 
-// POST new registration (prevent duplicates)
+// POST new registration (with full validation)
 app.post('/api/registrations', async (req, res) => {
   console.log("POST /api/registrations HIT");
   console.log("BODY:", req.body);
@@ -245,25 +391,152 @@ app.post('/api/registrations', async (req, res) => {
   try {
     const { student_id, course_id } = req.body;
 
-    console.log("Checking for existing registration…");
-
+    // Check if already registered
+    // Check if already registered (ANY status)
     const existing = await Registration.findOne({
       where: { 
-        student_id,
-        course_id,
-        status: 'added'
-      }
-    });
+      student_id,
+      course_id
+    }
+  });
 
-    console.log("Existing reg:", existing);
+  if (existing) {
+  // If already registered with 'added' status, reject
+    if (existing.status === 'added') {
+      return res.status(400).json({ 
+        error: "Already registered for this course" 
+      });
+  } 
+  
+  // If previously dropped, reactivate instead of creating new
+  await existing.update({ 
+    status: 'added', 
+    date_added: new Date() 
+  });
+  
+  console.log("REACTIVATED:", existing);
+  return res.status(201).json(existing);
+}
 
-    if (existing) {
-      console.log("Already registered.");
-      return res.status(400).json({ error: "Already registered for this course" });
+    // Get student info
+    const student = await Student.findByPk(student_id);
+    if (!student) {
+      return res.status(404).json({ error: "Student not found" });
     }
 
-    console.log("Creating new registration…");
+    // Get course info
+    const course = await Course.findByPk(course_id);
+    if (!course) {
+      return res.status(404).json({ error: "Course not found" });
+    }
 
+    // Get student's current registrations
+    const studentRegistrations = await Registration.findAll({
+      where: { 
+        student_id,
+        status: 'added'
+      },
+      include: [{ model: Course }]
+    });
+
+    let eligible = true;
+    const errorMessages = [];
+
+    // ===== 1. CHECK PREREQUISITES =====
+    if (course.prerequisites && course.prerequisites !== "None") {
+      const requiredCourseIds = course.prerequisites.split(',').map(id => id.trim());
+      const completedCourses = studentRegistrations.map(reg => reg.course_id.toString());
+      
+      const missingPrereqs = [];
+      for (const reqId of requiredCourseIds) {
+        if (!completedCourses.includes(reqId)) {
+          const reqCourse = await Course.findByPk(reqId);
+          if (reqCourse) {
+            missingPrereqs.push(reqCourse.course_code);
+          }
+        }
+      }
+      
+      if (missingPrereqs.length > 0) {
+        eligible = false;
+        errorMessages.push(`Missing prerequisites: ${missingPrereqs.join(', ')}`);
+      }
+    }
+
+    // ===== 2. CHECK MAJOR RESTRICTIONS =====
+    if (course.major_restricted && course.major_restricted !== "None") {
+      const allowedMajors = course.major_restricted.split(',').map(m => m.trim().toUpperCase());
+      
+      const majorMap = {
+        'MANAGEMENT INFORMATION SYSTEMS (MIS)': 'MIS',
+        'COMPUTER SCIENCE': 'CS',
+        'BUSINESS ADMINISTRATION': 'BA',
+        'FINANCE': 'FIN',
+        'MARKETING': 'MKT',
+        'ACCOUNTING': 'ACC',
+        'ECONOMICS': 'ECO',
+        'MECHANICAL ENGINEERING': 'ME',
+        'ELECTRICAL & COMPUTER ENGINEERING': 'ECE',
+        'CIVIL ENGINEERING': 'CE',
+        'PSYCHOLOGY': 'PSY',
+        'BIOLOGY': 'BIO',
+        'GOVERNMENT': 'GOV',
+        'COMMUNICATIONS & MEDIA STUDIES': 'CMS'
+      };
+      
+      const studentMajorUpper = (student.major || '').toUpperCase();
+      const studentMajorAbbrev = majorMap[studentMajorUpper] || studentMajorUpper;
+      
+      const isAllowed = allowedMajors.some(major => 
+        major === studentMajorAbbrev || 
+        major === studentMajorUpper ||
+        studentMajorUpper.includes(major)
+      );
+      
+      if (!isAllowed) {
+        eligible = false;
+        errorMessages.push(`Course restricted to ${allowedMajors.join(', ')} majors`);
+      }
+    }
+
+    // ===== 3. CHECK TIME CONFLICTS =====
+    if (course.time_start && course.time_end && course.days && course.days !== "TBD") {
+      const courseDays = course.days.split('');
+      
+      for (const reg of studentRegistrations) {
+        const enrolledCourse = reg.course_offering;
+        
+        if (!enrolledCourse.time_start || !enrolledCourse.time_end || 
+            !enrolledCourse.days || enrolledCourse.days === "TBD") {
+          continue;
+        }
+        
+        const enrolledDays = enrolledCourse.days.split('');
+        const sharedDays = courseDays.filter(day => enrolledDays.includes(day));
+        
+        if (sharedDays.length > 0) {
+          const courseStart = course.time_start;
+          const courseEnd = course.time_end;
+          const enrolledStart = enrolledCourse.time_start;
+          const enrolledEnd = enrolledCourse.time_end;
+          
+          if (courseStart < enrolledEnd && enrolledStart < courseEnd) {
+            eligible = false;
+            errorMessages.push(`Time conflict with ${enrolledCourse.course_code} (${sharedDays.join('')} ${enrolledStart}-${enrolledEnd})`);
+          }
+        }
+      }
+    }
+
+    // If not eligible, return error
+    if (!eligible) {
+      return res.status(400).json({ 
+        error: "Cannot register for this course",
+        details: errorMessages.join('\n')
+      });
+    }
+
+    // Create registration
     const newReg = await Registration.create({ 
       student_id, 
       course_id, 
@@ -271,36 +544,31 @@ app.post('/api/registrations', async (req, res) => {
     });
 
     console.log("CREATED:", newReg);
-
     res.status(201).json(newReg);
   } 
   catch (err) {
     console.error("REGISTRATION ERROR:", err);
-    res.status(500).json({ error: err.message });
-  }
+    console.error("Full error object:", JSON.stringify(err, null, 2));
+    res.status(500).json({ 
+    error: err.message,
+    details: err.toString(),
+    name: err.name,
+    stack: err.stack
+  });
+}
 });
 
-
-
-// DELETE registration
+// DELETE registration (updates status to "dropped" instead of deleting)
 app.delete('/api/registrations/:id', async (req, res) => {
   const reg = await Registration.findByPk(req.params.id);
   if (!reg) return res.status(404).send("Registration not found");
-
-  await reg.destroy();
+  await reg.update({ status: 'dropped' });
   res.status(204).send();
 });
 
-// NOTE: removed `alter: true` to avoid attempts to alter columns
-// that may be used by views/rules in the production database.
-// Use migrations when schema changes are required.
-sequelize.sync().then(() => {
-  console.log('Database synced successfully (no alter)');
-}).catch(err => {
-  console.error('Database sync error:', err);
-});
-
+// ============================================
 // START SERVER
+// ============================================
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });

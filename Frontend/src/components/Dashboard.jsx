@@ -5,6 +5,7 @@ import bannerImg from "../UT-Full-Stack-Image.avif";
 export default function Dashboard() {
   const [courses, setCourses] = useState([]);
   const [eligibility, setEligibility] = useState({});
+  const [registeredCourses, setRegisteredCourses] = useState([]);
   const [aiQuery, setAiQuery] = useState("");
   const [aiResponse, setAiResponse] = useState("");
 
@@ -113,6 +114,31 @@ export default function Dashboard() {
   }, [studentId]);
 
   // -----------------------------
+  // FETCH STUDENT'S REGISTERED COURSES
+  // -----------------------------
+  useEffect(() => {
+    async function loadRegisteredCourses() {
+      if (!studentId) return;
+      
+      try {
+        const res = await fetch(`${API}/api/registrations/student/${studentId}`);
+        const data = await res.json();
+        
+        // Extract course IDs that are currently added
+        const registeredIds = data
+          .filter(reg => reg.status === 'added')
+          .map(reg => reg.course_id);
+        
+        setRegisteredCourses(registeredIds);
+      } catch (err) {
+        console.error("Error loading registered courses:", err);
+      }
+    }
+
+    loadRegisteredCourses();
+  }, [studentId]);
+
+  // -----------------------------
   // GET ELIGIBILITY STATUS MESSAGE
   // -----------------------------
   function getEligibilityMessage(courseId) {
@@ -132,6 +158,14 @@ export default function Dashboard() {
     if (elig.major_check && !elig.major_check.valid) {
       const majors = elig.major_check.required_majors.join(', ');
       messages.push(`Restricted to ${majors} majors`);
+    }
+
+    // Check time conflict issues
+    if (elig.time_conflict_check && !elig.time_conflict_check.valid) {
+      const conflicts = elig.time_conflict_check.conflicts
+        .map(c => `${c.course_code}`)
+        .join(', ');
+      messages.push(`Conflicting Class: ${conflicts}`);
     }
 
     return messages.join(' | ');
@@ -182,6 +216,10 @@ export default function Dashboard() {
       }
 
       alert("Class added to your schedule!");
+      
+      // Refresh registered courses list
+      setRegisteredCourses([...registeredCourses, c.id]);
+      
       window.dispatchEvent(new Event("registrationsChanged"));
     } catch (err) {
       console.error("REGISTER ERROR:", err);
@@ -297,11 +335,12 @@ export default function Dashboard() {
               const elig = eligibility[c.id];
               const isEligible = !elig || elig.eligible;
               const message = getEligibilityMessage(c.id);
+              const isAlreadyAdded = registeredCourses.includes(c.id);
 
               return (
                 <tr 
                   key={c.id}
-                  style={!isEligible ? { backgroundColor: '#fff3cd' } : {}}
+                  style={!isEligible && !isAlreadyAdded ? { backgroundColor: '#fff3cd' } : {}}
                 >
                   <td>{c.code}</td>
                   <td>{c.title}</td>
@@ -312,7 +351,19 @@ export default function Dashboard() {
                   <td>{c.prerequisites}</td>
                   <td>{c.majorRestricted}</td>
                   <td>
-                    {isEligible ? (
+                    {isAlreadyAdded ? (
+                      <button
+                        className="btn-orange small"
+                        disabled
+                        style={{ 
+                          opacity: 0.7, 
+                          cursor: 'default',
+                          backgroundColor: '#28a745'
+                        }}
+                      >
+                        Added
+                      </button>
+                    ) : isEligible ? (
                       <button
                         className="btn-orange small"
                         onClick={() => register(c)}
