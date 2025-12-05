@@ -145,7 +145,6 @@ body {
 .table .small-muted { color: #666; font-size: 13px; }
 
 /* Login */
-
 .login-page {
   min-height: 100vh;
   display: flex;
@@ -159,15 +158,38 @@ body {
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   width: 350px;
+  text-align: center; /* centers labels, inputs, and button */
 }
 
-/* Desktop-first layout helpers */
-.row { display: flex; gap: 20px; align-items: flex-start; }
-.col { flex: 1; }
-.sidebar { width: 320px; }
+/* INPUTS */
+.login-card .input {
+  width: 100%;
+  max-width: 300px;
+  display: block;       /* forces its own line */
+  margin: 8px auto;     /* centers input horizontally */
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
 
-.login-card .page-title {
-  text-align: center;
+.login-card .label {
+  font-size: 14px;
+  font-weight: 500;
+  display: block;
+  text-align: left;
+  max-width: 300px;
+  margin: 10px auto 4px; /* aligns with inputs */
+}
+
+.login-card .btn-orange {
+  width: 100%;
+  max-width: 300px;
+  display: block;
+  margin: 12px auto 0;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 15px;
 }
 
 .error-text {
