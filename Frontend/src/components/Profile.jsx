@@ -8,11 +8,14 @@ export default function Profile() {
     name: "",
     email: "",
     major: "",
-    classification: "",
+    classification: "Freshman",
   });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const nav = useNavigate();
   const studentId = localStorage.getItem("student_id");
+  const userEmail = localStorage.getItem("user_email");
 
   function update(field, value) {
     setForm({ ...form, [field]: value });
@@ -20,24 +23,53 @@ export default function Profile() {
 
   // Load user info
   useEffect(() => {
-    if (!studentId) return;
+    console.log("Loading profile...");
+    console.log("Student ID:", studentId);
+    console.log("User Email:", userEmail);
 
+    if (!studentId) {
+      nav("/login");
+      return;
+    }
+
+    setLoading(true);
     fetch(`${API}/api/students/${studentId}`)
-      .then((res) => res.json())
-      .then((data) =>
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load profile");
+        return res.json();
+      })
+      .then((data) => {
+        console.log("Backend data:", data);
         setForm({
           name: data.name || "",
-          email: data.email || "",
+          email: data.email || userEmail || "",
           major: data.major || "",
-          classification: data.classification || "",
-        })
-      )
-      .catch((err) => console.error("Profile load error:", err));
-  }, [studentId]);
+          classification: data.classification || "Freshman",
+        });
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Profile load error:", err);
+        // If backend fails, still populate email from localStorage
+        setForm(prev => ({
+          ...prev,
+          email: userEmail || ""
+        }));
+        setLoading(false);
+      });
+  }, [studentId, userEmail, nav]);
 
   // Save Profile
   async function saveProfile() {
+    if (!studentId) {
+      alert("No student ID found. Please log in again.");
+      return;
+    }
+
+    setSaving(true);
     try {
+      console.log("Saving profile:", form);
+      
       const res = await fetch(`${API}/api/students/${studentId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -45,15 +77,33 @@ export default function Profile() {
       });
 
       if (!res.ok) {
-        alert("Error saving profile.");
-        return;
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Error saving profile");
       }
 
-      alert("Profile saved!");
+      const updatedData = await res.json();
+      console.log("Saved successfully:", updatedData);
+      
+      // Update form with confirmed backend data
+      setForm({
+        name: updatedData.name || form.name,
+        email: updatedData.email || form.email,
+        major: updatedData.major || form.major,
+        classification: updatedData.classification || form.classification,
+      });
+
+      alert("Profile saved successfully!");
     } catch (err) {
-      console.error(err);
-      alert("Error saving profile.");
+      console.error("Save error:", err);
+      alert(err.message || "Error saving profile.");
+    } finally {
+      setSaving(false);
     }
+  }
+
+  // Back to Dashboard
+  function goBack() {
+    nav("/dashboard");
   }
 
   // Logout
@@ -62,8 +112,33 @@ export default function Profile() {
     nav("/login");
   }
 
-  return (
-    <div className="profile-card">
+  if (loading) {
+    return <div className="profile-card">Loading profile...</div>;
+  }
+
+return (
+  <div className="profile-card" style={{ position: 'relative', paddingTop: '60px' }}>
+    {/* Back Button */}
+    <button 
+      onClick={goBack}
+      style={{
+        position: 'absolute',
+        top: '20px',
+        left: '20px',
+        background: 'none',
+        border: 'none',
+        fontSize: '20px',
+        cursor: 'pointer',
+        color: '#bf5700',
+        fontWeight: 'bold',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '5px'
+      }}
+    >
+      ← Back
+    </button>
+
       <h2 className="profile-title">Profile</h2>
 
       <label>Name</label>
@@ -71,13 +146,16 @@ export default function Profile() {
         className="input"
         value={form.name}
         onChange={(e) => update("name", e.target.value)}
+        placeholder="Enter your name"
       />
 
       <label>Email</label>
       <input
         className="input"
+        type="email"
         value={form.email}
         onChange={(e) => update("email", e.target.value)}
+        placeholder="Enter your email"
       />
 
       <label>Major</label>
@@ -115,10 +193,13 @@ export default function Profile() {
         <option>Senior</option>
       </select>
 
-      {/* Buttons */}
       <div className="profile-actions">
-        <button className="btn-orange" onClick={saveProfile}>
-          Save Profile
+        <button 
+          className="btn-orange" 
+          onClick={saveProfile}
+          disabled={saving}
+        >
+          {saving ? "Saving..." : "Save Profile"}
         </button>
 
         <button className="logout-btn" onClick={logout}>

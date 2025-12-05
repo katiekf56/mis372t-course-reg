@@ -36,6 +36,7 @@ export default function Login() {
 
       // Store for later use
       localStorage.setItem("student_id", data.student_id);
+      localStorage.setItem("user_email", email);
 
       nav('/dashboard');
     } catch (err) {
@@ -45,7 +46,7 @@ export default function Login() {
       } else if (err.code === 'auth/user-not-found') {
         setError("No user found with this email.");
       } else if (err.code === 'auth/wrong-password') {
-        setError("Incorrect password.");
+        setError("Incorrect passfword.");
       } else {
         setError(`Error: ${err.message}`);
       }

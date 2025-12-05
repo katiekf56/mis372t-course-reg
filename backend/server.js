@@ -99,6 +99,15 @@ sequelize.sync().then(() => {
 
 // ROUTES — STUDENTS
 
+// GET student by ID -- checking if student info saved
+app.get('/api/students/:id', async (req, res) => {
+  const student = await Student.findByPk(req.params.id);
+  if (!student) {
+    return res.status(404).json({ error: "Student not found" });
+  }
+  res.json(student);
+});
+
 // GET student by email (Login.jsx)
 app.get('/api/students/email/:email', async (req, res) => {
   const student = await Student.findOne({ where: { email: req.params.email } });
@@ -110,10 +119,14 @@ app.get('/api/students/email/:email', async (req, res) => {
 
 // UPDATE student (Profile.jsx)
 app.put('/api/students/:id', async (req, res) => {
+  const { name, email, major, classification } = req.body;
+  
   const student = await Student.findByPk(req.params.id);
-  if (!student) return res.status(404).send("Student not found");
-
-  await student.update(req.body);
+  if (!student) {
+    return res.status(404).json({ error: "Student not found" });
+  }
+  
+  await student.update({ name, email, major, classification });
   res.json(student);
 });
 
