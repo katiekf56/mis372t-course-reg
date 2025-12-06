@@ -194,7 +194,13 @@ export default function Dashboard() {
     if (filterEligible) {
       filtered = filtered.filter(c => {
         const elig = eligibility[c.id];
-        return (!elig || elig.eligible) && c.seatsAvailable > 0;
+        if (!elig) return true; // If no eligibility data, show it
+        
+        // Only check prerequisites and major restrictions (ignore time conflicts and seats)
+        const prereqValid = !elig.prerequisite_check || elig.prerequisite_check.valid !== false;
+        const majorValid = !elig.major_check || elig.major_check.valid !== false;
+        
+        return prereqValid && majorValid;
       });
     }
 
