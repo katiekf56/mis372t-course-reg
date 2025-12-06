@@ -94,20 +94,29 @@ export default function Dashboard() {
         const data = await res.json();
         
         const formatted = await Promise.all(
-          data.map(async (c) => ({
-            id: c.course_id,
-            code: c.course_code,
-            title: c.title,
-            prof: c.professor,
-            time: `${formatTime(c.time_start)} - ${formatTime(c.time_end)}`,
-            department: c.department || "N/A",
-            days: c.days || "TBD",
-            prerequisites: await getPrerequisiteNames(c.prerequisites),
-            prerequisitesRaw: c.prerequisites,
-            majorRestricted: c.major_restricted || "None",
-            seatsAvailable: c.seats_available || 0,
-            seatsTotal: c.capacity || 0
-          }))
+          data.map(async (c) => {
+            // Extract department from course code if not provided (e.g., "CS 101" -> "CS")
+            let dept = c.department;
+            if (!dept || dept === "N/A") {
+              const deptMatch = c.course_code.split(' ')[0]; // Extract before space
+              dept = deptMatch || "N/A";
+            }
+            
+            return {
+              id: c.course_id,
+              code: c.course_code,
+              title: c.title,
+              prof: c.professor,
+              time: `${formatTime(c.time_start)} - ${formatTime(c.time_end)}`,
+              department: dept,
+              days: c.days || "TBD",
+              prerequisites: await getPrerequisiteNames(c.prerequisites),
+              prerequisitesRaw: c.prerequisites,
+              majorRestricted: c.major_restricted || "None",
+              seatsAvailable: c.seats_available || 0,
+              seatsTotal: c.capacity || 0
+            };
+          })
         );
         
         setCourses(formatted);
@@ -180,8 +189,8 @@ export default function Dashboard() {
     return messages.join(' | ');
   }
 
-  // Get unique departments for filter dropdown
-  const departments = [...new Set(courses.map(c => c.department))].sort();
+  // Get unique departments for filter dropdown (exclude N/A)
+  const departments = [...new Set(courses.map(c => c.department).filter(d => d && d !== "N/A"))].sort();
 
   // Filter courses (no sort)
   function getFilteredCourses() {
