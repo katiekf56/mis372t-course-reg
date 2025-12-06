@@ -66,6 +66,17 @@ export default function Profile() {
       return;
     }
 
+    if (!form.name.trim()) {
+      alert("Name is required.");
+      return;
+    }
+
+    const emailPattern = /.+@.+\..+/;
+    if (!form.email.trim() || !emailPattern.test(form.email)) {
+      alert("Please enter a valid email.");
+      return;
+    }
+
     setSaving(true);
     try {
       console.log("Saving profile:", form);

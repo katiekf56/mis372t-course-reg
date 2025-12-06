@@ -8,6 +8,11 @@ export default function Dashboard() {
   const [registeredCourses, setRegisteredCourses] = useState([]);
   const [aiQuery, setAiQuery] = useState("");
   const [aiResponse, setAiResponse] = useState("");
+  const [filterDept, setFilterDept] = useState("");
+  const [filterEligible, setFilterEligible] = useState(false);
+  const [filterOpenSeats, setFilterOpenSeats] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const nav = useNavigate();
   const studentId = localStorage.getItem("student_id");
@@ -99,7 +104,9 @@ export default function Dashboard() {
             days: c.days || "TBD",
             prerequisites: await getPrerequisiteNames(c.prerequisites),
             prerequisitesRaw: c.prerequisites,
-            majorRestricted: c.major_restricted || "None"
+            majorRestricted: c.major_restricted || "None",
+            seatsAvailable: c.seats_available || 0,
+            seatsTotal: c.capacity || 0
           }))
         );
         
@@ -107,7 +114,9 @@ export default function Dashboard() {
         await checkAllEligibility(formatted);
       } catch (err) {
         console.error("Error loading courses:", err);
+        setError("Could not load courses.");
       }
+      setLoading(false);
     }
 
     loadCourses();
@@ -171,6 +180,31 @@ export default function Dashboard() {
     return messages.join(' | ');
   }
 
+  // Get unique departments for filter dropdown
+  const departments = [...new Set(courses.map(c => c.department))].sort();
+
+  // Filter courses (no sort)
+  function getFilteredCourses() {
+    let filtered = courses;
+
+    if (filterDept) {
+      filtered = filtered.filter(c => c.department === filterDept);
+    }
+
+    if (filterEligible) {
+      filtered = filtered.filter(c => {
+        const elig = eligibility[c.id];
+        return (!elig || elig.eligible) && c.seatsAvailable > 0;
+      });
+    }
+
+    if (filterOpenSeats) {
+      filtered = filtered.filter(c => c.seatsAvailable > 0);
+    }
+
+    return filtered;
+  }
+
   // -----------------------------
   // REGISTER FOR CLASS
   // -----------------------------
@@ -178,7 +212,7 @@ export default function Dashboard() {
     console.log("REGISTER CLICKED:", c);
 
     if (!studentId) {
-      alert("You must be logged in.");
+      setError("You must be logged in.");
       return;
     }
 
@@ -186,7 +220,7 @@ export default function Dashboard() {
     const elig = eligibility[c.id];
     if (elig && !elig.eligible) {
       const message = getEligibilityMessage(c.id);
-      alert(`Cannot register:\n${message}`);
+      setError(`Cannot register: ${message}`);
       return;
     }
 
@@ -211,11 +245,11 @@ export default function Dashboard() {
 
       if (!res.ok) {
         // Show the detailed error message from backend
-        alert(data.details || data.error || "Could not add class.");
+        setError(data.details || data.error || "Could not add class.");
         return;
       }
 
-      alert("Class added to your schedule!");
+      setError("");
       
       // Refresh registered courses list
       setRegisteredCourses([...registeredCourses, c.id]);
@@ -278,13 +312,16 @@ export default function Dashboard() {
       <div className="container">
         <h2 className="page-title">Welcome to UT Course Registration</h2>
 
+        {error && (
+          <div style={{ background: '#ffe6e6', color: '#a30000', padding: '10px 12px', borderRadius: '8px', marginBottom: '12px', border: '1px solid #f5c2c7' }}>
+            {error}
+          </div>
+        )}
+
         {/* BUTTON BAR */}
         <div className="button-bar">
           <button className="btn-orange" onClick={() => nav("/search")}>
             🔍 Search Course Schedule
-          </button>
-          <button className="btn-orange" onClick={() => nav("/add-class")}>
-            ➕ Add New Class
           </button>
           <button className="btn-orange" onClick={() => nav("/profile")}>
             👤 Profile
@@ -292,6 +329,41 @@ export default function Dashboard() {
           <button className="btn-orange" onClick={() => nav("/schedule")}>
             🗂️ View My Classes
           </button>
+        </div>
+
+        {/* FILTERS */}
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div>
+            <label style={{ marginRight: '8px', fontWeight: '500' }}>Department:</label>
+            <select 
+              value={filterDept} 
+              onChange={(e) => setFilterDept(e.target.value)}
+              style={{ padding: '8px', borderRadius: '6px', border: '1px solid #ccc' }}
+            >
+              <option value="">All Departments</option>
+              {departments.map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <input 
+              type="checkbox" 
+              checked={filterEligible} 
+              onChange={(e) => setFilterEligible(e.target.checked)}
+            />
+            <span style={{ fontWeight: '500' }}>Show only eligible</span>
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <input 
+              type="checkbox" 
+              checked={filterOpenSeats} 
+              onChange={(e) => setFilterOpenSeats(e.target.checked)}
+            />
+            <span style={{ fontWeight: '500' }}>Open seats only</span>
+          </label>
         </div>
 
         {/* AI BOX */}
@@ -315,32 +387,48 @@ export default function Dashboard() {
         {/* COURSE TABLE */}
         <h2 className="section-title">Browse Courses</h2>
 
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Course</th>
-              <th>Title</th>
-              <th>Dept</th>
-              <th>Professor</th>
-              <th>Days</th>
-              <th>Time</th>
-              <th>Prerequisites</th>
-              <th>Major Restricted</th>
-              <th></th>
-            </tr>
-          </thead>
+        {loading && (
+          <div style={{ marginBottom: '12px', color: '#555', padding: '20px', textAlign: 'center' }}>Loading courses...</div>
+        )}
 
-          <tbody>
-            {courses.map((c) => {
-              const elig = eligibility[c.id];
-              const isEligible = !elig || elig.eligible;
-              const message = getEligibilityMessage(c.id);
+        {!loading && (
+          <>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Course</th>
+                  <th>Title</th>
+                  <th>Dept</th>
+                  <th>Professor</th>
+                  <th>Days</th>
+                  <th>Time</th>
+                  <th>Seats (filled/total)</th>
+                  <th>Prerequisites</th>
+                  <th>Major Restricted</th>
+                  <th></th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {getFilteredCourses().length === 0 && (
+                  <tr>
+                    <td colSpan="10" style={{ padding: '14px', color: '#555' }}>No courses match these filters.</td>
+                  </tr>
+                )}
+
+                {getFilteredCourses().map((c) => {
+                  const elig = eligibility[c.id];
+                  const isEligible = !elig || elig.eligible;
+                  const message = getEligibilityMessage(c.id);
               const isAlreadyAdded = registeredCourses.includes(c.id);
+              const isFull = c.seatsAvailable <= 0;
+              const seatsTotal = c.seatsTotal || 0;
+              const seatsFilled = Math.max(0, seatsTotal - c.seatsAvailable);
 
               return (
                 <tr 
                   key={c.id}
-                  style={!isEligible && !isAlreadyAdded ? { backgroundColor: '#fff3cd' } : {}}
+                  style={(!isEligible || isFull) && !isAlreadyAdded ? { backgroundColor: '#fff3cd' } : {}}
                 >
                   <td>{c.code}</td>
                   <td>{c.title}</td>
@@ -348,6 +436,12 @@ export default function Dashboard() {
                   <td>{c.prof}</td>
                   <td>{c.days}</td>
                   <td>{c.time}</td>
+                  <td style={{ fontWeight: isFull ? 'bold' : 'normal', color: isFull ? '#a30000' : 'inherit' }}>
+                    {seatsFilled}/{seatsTotal}
+                    <div style={{ fontSize: '11px', color: '#555' }}>
+                      {c.seatsAvailable} open
+                    </div>
+                  </td>
                   <td>{c.prerequisites}</td>
                   <td>{c.majorRestricted}</td>
                   <td>
@@ -363,6 +457,21 @@ export default function Dashboard() {
                       >
                         Added
                       </button>
+                    ) : isFull ? (
+                      <div style={{ fontSize: '12px', color: '#a30000' }}>
+                        <button
+                          className="btn-orange small"
+                          disabled
+                          style={{ 
+                            opacity: 0.5, 
+                            cursor: 'not-allowed',
+                            backgroundColor: '#ccc'
+                          }}
+                          title="Course is full"
+                        >
+                          Full
+                        </button>
+                      </div>
                     ) : isEligible ? (
                       <button
                         className="btn-orange small"
@@ -393,8 +502,10 @@ export default function Dashboard() {
                 </tr>
               );
             })}
-          </tbody>
-        </table>
+              </tbody>
+            </table>
+          </>
+        )}
       </div>
     </>
   );

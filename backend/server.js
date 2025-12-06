@@ -430,6 +430,14 @@ app.post('/api/registrations', async (req, res) => {
       return res.status(404).json({ error: "Course not found" });
     }
 
+    // Check if course is full
+    if (course.seats_available <= 0) {
+      return res.status(400).json({ 
+        error: "Cannot register for this course",
+        details: "This course is full and no seats are available"
+      });
+    }
+
     // Get student's current registrations
     const studentRegistrations = await Registration.findAll({
       where: { 
