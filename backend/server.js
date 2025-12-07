@@ -92,6 +92,54 @@ sequelize.sync().then(() => {
 });
 
 // ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+/**
+ * Extract credit hours from course code
+ * First digit of course number = credit hours (e.g., "MIS 372" = 3 credits)
+ */
+function getCreditHours(courseCode) {
+  if (!courseCode) return 0;
+  
+  // Extract the numeric part (e.g., "MIS 372T" -> "372")
+  const match = courseCode.match(/\d+/);
+  if (!match) return 0;
+  
+  const courseNumber = match[0];
+  // First digit is the credit hours
+  const firstDigit = parseInt(courseNumber.charAt(0));
+  
+  return isNaN(firstDigit) ? 0 : firstDigit;
+}
+
+/**
+ * Calculate total credit hours for a student's active registrations
+ */
+async function calculateTotalCredits(studentId, excludeCourseId = null) {
+  const registrations = await Registration.findAll({
+    where: { 
+      student_id: studentId,
+      status: 'added'
+    },
+    include: [{ model: Course }]
+  });
+  
+  let totalCredits = 0;
+  for (const reg of registrations) {
+    // Skip the course we're about to add (for checking if we can add it)
+    if (excludeCourseId && reg.course_id === excludeCourseId) {
+      continue;
+    }
+    
+    const credits = getCreditHours(reg.course_offering.course_code);
+    totalCredits += credits;
+  }
+  
+  return totalCredits;
+}
+
+// ============================================
 // ROUTES — STUDENTS
 // ============================================
 
@@ -359,6 +407,24 @@ app.get('/api/courses/:course_id/eligibility/:student_id', async (req, res) => {
       }
     }
 
+    // ===== 4. CHECK CREDIT HOUR LIMIT (MAX 17) =====
+    const currentCredits = await calculateTotalCredits(student_id);
+    const newCourseCredits = getCreditHours(course.course_code);
+    const totalCreditsAfterAdding = currentCredits + newCourseCredits;
+    const MAX_CREDITS = 17;
+    
+    checks.credit_check = {
+      valid: totalCreditsAfterAdding <= MAX_CREDITS,
+      current_credits: currentCredits,
+      course_credits: newCourseCredits,
+      total_after_adding: totalCreditsAfterAdding,
+      max_allowed: MAX_CREDITS
+    };
+    
+    if (totalCreditsAfterAdding > MAX_CREDITS) {
+      eligible = false;
+    }
+
     res.json({
       eligible,
       ...checks
@@ -408,7 +474,27 @@ app.post('/api/registrations', async (req, res) => {
       });
   } 
   
-  // If previously dropped, reactivate instead of creating new
+  // If previously dropped, check credit limit before reactivating
+  const course = await Course.findByPk(course_id);
+  if (!course) {
+    return res.status(404).json({ error: "Course not found" });
+  }
+  
+  const currentCredits = await calculateTotalCredits(student_id);
+  const courseCredits = getCreditHours(course.course_code);
+  const totalCreditsAfterAdding = currentCredits + courseCredits;
+  const MAX_CREDITS = 17;
+  
+  if (totalCreditsAfterAdding > MAX_CREDITS) {
+    return res.status(400).json({ 
+      error: "Cannot register for this course",
+      details: `Credit limit exceeded: Adding this ${courseCredits}-credit course would give you ${totalCreditsAfterAdding} credits total. ` +
+               `Maximum allowed is ${MAX_CREDITS} credits. You currently have ${currentCredits} credits enrolled. ` +
+               `Please contact an administrator for approval to exceed the credit limit.`
+    });
+  }
+  
+  // Reactivate the dropped course
   await existing.update({ 
     status: 'added', 
     date_added: new Date() 
@@ -534,6 +620,22 @@ app.post('/api/registrations', async (req, res) => {
           }
         }
       }
+    }
+
+    // ===== 4. CHECK CREDIT HOUR LIMIT (MAX 17) =====
+    const currentCredits = await calculateTotalCredits(student_id);
+    const newCourseCredits = getCreditHours(course.course_code);
+    const totalCreditsAfterAdding = currentCredits + newCourseCredits;
+    
+    const MAX_CREDITS = 17;
+    
+    if (totalCreditsAfterAdding > MAX_CREDITS) {
+      eligible = false;
+      errorMessages.push(
+        `Credit limit exceeded: Adding this ${newCourseCredits}-credit course would give you ${totalCreditsAfterAdding} credits total. ` +
+        `Maximum allowed is ${MAX_CREDITS} credits. You currently have ${currentCredits} credits enrolled. ` +
+        `Please contact an administrator for approval to exceed the credit limit.`
+      );
     }
 
     // If not eligible, return error

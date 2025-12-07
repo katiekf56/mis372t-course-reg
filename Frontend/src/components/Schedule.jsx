@@ -13,6 +13,21 @@ export default function Schedule() {
   const API = import.meta.env.VITE_API_BASE || "http://localhost:5001";
 
   // ----------------------------
+  // GET CREDIT HOURS FROM COURSE CODE
+  // ----------------------------
+  function getCreditHours(courseCode) {
+    if (!courseCode) return 0;
+    const match = courseCode.match(/\d+/);
+    if (!match) return 0;
+    const courseNumber = match[0];
+    const firstDigit = parseInt(courseNumber.charAt(0));
+    return isNaN(firstDigit) ? 0 : firstDigit;
+  }
+
+  // Calculate total credits
+  const totalCredits = classes.reduce((sum, cls) => sum + getCreditHours(cls.code), 0);
+
+  // ----------------------------
   // FORMAT TIME → "4:00 PM"
   // ----------------------------
   function formatTime(t) {
@@ -154,6 +169,25 @@ export default function Schedule() {
         <p style={{ textAlign: 'center', color: '#666' }}>No classes in your schedule yet.</p>
       ) : (
         <>
+          {/* Credit Hours Summary */}
+          <div style={{ 
+            background: totalCredits > 17 ? '#fff3cd' : totalCredits >= 15 ? '#e6f3ff' : '#e6ffe6', 
+            padding: '12px 16px', 
+            borderRadius: '8px', 
+            marginBottom: '16px',
+            border: `2px solid ${totalCredits > 17 ? '#856404' : totalCredits >= 15 ? '#004085' : '#155724'}`,
+            textAlign: 'center'
+          }}>
+            <strong style={{ fontSize: '18px' }}>
+              Total Credit Hours: {totalCredits} / 17
+            </strong>
+            {totalCredits > 17 && (
+              <div style={{ fontSize: '13px', color: '#856404', marginTop: '4px' }}>
+                ⚠️ You have exceeded the maximum credit limit.
+              </div>
+            )}
+          </div>
+
           {/* View Toggle */}
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '20px' }}>
             <button
@@ -175,10 +209,23 @@ export default function Schedule() {
           {/* LIST VIEW */}
           {viewMode === "list" && (
             <div>
-              {classes.map((c) => (
+              {classes.map((c) => {
+                const credits = getCreditHours(c.code);
+                return (
                 <div key={c.enrollment_id} className="schedule-item">
                   <div className="schedule-main">
-                    <strong>{c.code}</strong> — {c.title}
+                    <strong>{c.code}</strong> — {c.title} 
+                    <span style={{ 
+                      marginLeft: '10px', 
+                      padding: '2px 8px', 
+                      background: '#bf5700', 
+                      color: 'white', 
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: 'bold'
+                    }}>
+                      {credits} credit{credits !== 1 ? 's' : ''}
+                    </span>
                   </div>
 
                   <div className="schedule-sub">
@@ -192,7 +239,8 @@ export default function Schedule() {
                     Drop
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

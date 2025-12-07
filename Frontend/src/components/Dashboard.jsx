@@ -6,6 +6,7 @@ export default function Dashboard() {
   const [courses, setCourses] = useState([]);
   const [eligibility, setEligibility] = useState({});
   const [registeredCourses, setRegisteredCourses] = useState([]);
+  const [currentCredits, setCurrentCredits] = useState(0);
   const [aiQuery, setAiQuery] = useState("");
   const [aiResponse, setAiResponse] = useState("");
   const [filterDept, setFilterDept] = useState("");
@@ -17,6 +18,18 @@ export default function Dashboard() {
   const nav = useNavigate();
   const studentId = localStorage.getItem("student_id");
   const API = import.meta.env.VITE_API_BASE || "http://localhost:5001";
+
+  // -----------------------------
+  // GET CREDIT HOURS FROM COURSE CODE
+  // -----------------------------
+  function getCreditHours(courseCode) {
+    if (!courseCode) return 0;
+    const match = courseCode.match(/\d+/);
+    if (!match) return 0;
+    const courseNumber = match[0];
+    const firstDigit = parseInt(courseNumber.charAt(0));
+    return isNaN(firstDigit) ? 0 : firstDigit;
+  }
 
   // -----------------------------
   // FORMAT TIME → "4:00 PM"
@@ -148,6 +161,14 @@ export default function Dashboard() {
           .map(reg => reg.course_id);
         
         setRegisteredCourses(registeredIds);
+        
+        // Calculate current credit hours
+        let totalCredits = 0;
+        data.filter(reg => reg.status === 'added').forEach(reg => {
+          const credits = getCreditHours(reg.course_offering.course_code);
+          totalCredits += credits;
+        });
+        setCurrentCredits(totalCredits);
       } catch (err) {
         console.error("Error loading registered courses:", err);
       }
@@ -184,6 +205,11 @@ export default function Dashboard() {
         .map(c => `${c.course_code}`)
         .join(', ');
       messages.push(`Conflicting Class: ${conflicts}`);
+    }
+
+    // Check credit limit issues
+    if (elig.credit_check && !elig.credit_check.valid) {
+      messages.push(`Credit limit: ${elig.credit_check.total_after_adding}/${elig.credit_check.max_allowed}`);
     }
 
     return messages.join(' | ');
@@ -266,8 +292,12 @@ export default function Dashboard() {
 
       setError("");
       
-      // Refresh registered courses list
+      // Refresh registered courses list and recalculate credits
       setRegisteredCourses([...registeredCourses, c.id]);
+      
+      // Update current credits
+      const courseCredits = getCreditHours(c.code);
+      setCurrentCredits(currentCredits + courseCredits);
       
       window.dispatchEvent(new Event("registrationsChanged"));
     } catch (err) {
@@ -413,6 +443,7 @@ export default function Dashboard() {
                 <tr>
                   <th>Course</th>
                   <th>Title</th>
+                  <th>Credits</th>
                   <th>Dept</th>
                   <th>Professor</th>
                   <th>Days</th>
@@ -427,7 +458,7 @@ export default function Dashboard() {
               <tbody>
                 {getFilteredCourses().length === 0 && (
                   <tr>
-                    <td colSpan="10" style={{ padding: '14px', color: '#555' }}>No courses match these filters.</td>
+                    <td colSpan="11" style={{ padding: '14px', color: '#555' }}>No courses match these filters.</td>
                   </tr>
                 )}
 
@@ -439,6 +470,7 @@ export default function Dashboard() {
               const isFull = c.seatsAvailable <= 0;
               const seatsTotal = c.seatsTotal || 0;
               const seatsFilled = Math.max(0, seatsTotal - c.seatsAvailable);
+              const courseCredits = getCreditHours(c.code);
 
               return (
                 <tr 
@@ -447,6 +479,7 @@ export default function Dashboard() {
                 >
                   <td>{c.code}</td>
                   <td>{c.title}</td>
+                  <td style={{ textAlign: 'center', fontWeight: '600' }}>{courseCredits}</td>
                   <td>{c.department}</td>
                   <td>{c.prof}</td>
                   <td>{c.days}</td>
